@@ -1,48 +1,68 @@
-unsigned long pulseWidth;
 
-unsigned long  previous_distance = 0;
-unsigned long  current_distance = 0;
+#include <Wire.h>
+#include <LIDARLite.h>
 
-double current_speed = 0;
-unsigned long current_time = 0;
+#define ITERATOR 50
+
+LIDARLite myLidarLite;
+
+unsigned long  prev_dist = 0;
+unsigned long  curr_dist = 0;
+
+double curr_speed = 0;
+unsigned long curr_time = 0;
+
+int k = 0;
 
 void setup()
 {
-  Serial.begin(115200); // Start serial communications
+  Serial.begin(115200); // Initialize serial connection to display distance readings
 
-  pinMode(2, OUTPUT); // Set pin 2 as trigger pin
-  digitalWrite(2, LOW); // Set trigger LOW for continuous read
-
-  pinMode(3, INPUT); // Set pin 3 as monitor pin
+  myLidarLite.begin(0, true); // Set configuration to default and I2C to 400 kHz
+  myLidarLite.configure(0); // Change this number to try out alternate configurations
 }
+
+
+double typicalBreakingDistance(double curr_speed) {
+    double result = 0.039 * curr_speed * curr_speed * 0.2941;
+
+    return result;
+}
+
+boolean isRLR(int curr_dist, double curr_speed) {
+    double breaking_distance = typicalBreakingDistance(curr_speed);
+    Serial.print("typical breaking distance : ");
+    Serial.println(breaking_distance);
+    if (curr_dist > 0 && curr_dist * 0.01 < breaking_distance) {
+        Serial.println("WARNING ! ! ");
+    }
+    
+}
+
 
 void loop()
 {
-  
-  pulseWidth = pulseIn(3, HIGH); // Count how long the pulse is high in microseconds
-
-  long previous_time;
+  long prev_time;
   long elapsed_time;
-  
-  if(pulseWidth != 0)
-  {
-    previous_time = current_time;
-    current_time = millis();
-    elapsed_time = current_time - previous_time;
-    
-    previous_distance = current_distance;
-    current_distance = pulseWidth / 10; // 10usec = 1 cm of distance
-    current_speed = (double)(previous_distance - current_distance) / elapsed_time * 36;
 
-    if (current_distance <= 4000 && current_speed <= 10000){
-      Serial.print("Distance : ");
-      Serial.print(current_distance);
-      Serial.print("\tspeed : ");
-      Serial.print(current_speed); // Print the distance//
-      Serial.println("km/h");
-    }
+  prev_time = curr_time;
+  curr_time = millis();
+  elapsed_time = curr_time - prev_time;
+  prev_dist = curr_dist;
+  curr_dist = (double)myLidarLite.distance(); 
+  curr_speed = (double)(prev_dist - curr_dist) / elapsed_time * 36;
+
+  if (curr_dist <= 4000 && curr_speed <= 10000)
+  {
+    
+    Serial.print("Distance : ");
+    Serial.print(curr_dist);
+    Serial.print("\tspeed : ");
+    Serial.print(curr_speed); // Print the distance//
+    Serial.println("km/h");
+
+    isRLR(curr_dist, curr_speed);
   }
-  
-  delay(50);  
-  
+    
+  delay(100);
 }
